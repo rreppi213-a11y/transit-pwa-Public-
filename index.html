@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="교통내역">
+<meta name="theme-color" content="#2563eb">
+<meta name="description" content="2026년 1월 교통/하이패스 이용내역">
+
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-152x152.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192x192.png">
+
+<title>교통/하이패스내역</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+  --blue: #2563eb;
+  --blue-light: #e7f3ff;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #f2f4f8;
+  font-family: 'Noto Sans KR', -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Full screen app layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: #f2f4f8;
+  position: relative;
+}
+
+/* ── Status bar area (only shows on standalone) ── */
+.safe-top {
+  height: var(--safe-top);
+  background: #fff;
+  flex-shrink: 0;
+}
+
+/* ── App header ── */
+.app-header {
+  background: #fff;
+  padding: 10px 18px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  border-bottom: 1px solid #ececec;
+  position: relative;
+  z-index: 10;
+}
+.btn-back {
+  font-size: 26px; font-weight: 300;
+  color: #111; line-height: 1;
+  width: 32px; cursor: pointer;
+  user-select: none;
+}
+.header-title { font-size: 17px; font-weight: 700; color: #111; }
+.btn-menu {
+  display: flex; flex-direction: column;
+  gap: 5px; width: 32px; align-items: flex-end;
+  cursor: pointer; user-select: none;
+}
+.btn-menu i { display: block; background: #111; border-radius: 1.5px; height: 2px; }
+.btn-menu i:nth-child(1) { width: 22px; }
+.btn-menu i:nth-child(2) { width: 15px; }
+.btn-menu i:nth-child(3) { width: 22px; }
+
+/* ── Summary section (sticky header) ── */
+.sticky-header {
+  background: #fff;
+  flex-shrink: 0;
+  border-bottom: 1px solid #ececec;
+}
+
+.summary-card {
+  margin: 14px 16px 12px;
+  background: var(--blue-light);
+  border-radius: 14px;
+  padding: 18px 20px;
+  text-align: center;
+}
+.summary-period { font-size: 12.5px; color: #7a8fa8; margin-bottom: 4px; }
+.summary-label  { font-size: 14px;   color: #4a5e72; margin-bottom: 5px; }
+.summary-amount {
+  font-size: 30px; font-weight: 800;
+  color: #111; letter-spacing: -1px;
+  display: flex; align-items: baseline;
+  justify-content: center; gap: 2px;
+}
+.summary-amount .pre  { font-size: 20px; font-weight: 700; }
+.summary-amount .num  { font-size: 30px; font-weight: 800; }
+.summary-amount .unit { font-size: 17px; font-weight: 500; color: #444; }
+.summary-amount .cnt  { font-size: 15px; font-weight: 400; color: #888; }
+
+.filter-bar {
+  margin: 0 16px 10px;
+  border: 1px solid #e0e0e0; border-radius: 10px;
+  background: #fff; padding: 13px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer;
+}
+.filter-label { font-size: 14px; color: #333; font-weight: 500; }
+.filter-v { font-size: 18px; color: #aaa; }
+
+.count-area { padding: 2px 18px 14px; }
+.count-total { font-size: 15px; color: #111; font-weight: 500; }
+.count-total strong { color: var(--blue); font-weight: 700; }
+.count-date { font-size: 12px; color: #bbb; margin-top: 2px; }
+.btn-receipt {
+  display: inline-block; margin-top: 9px;
+  border: 1px solid #ccc; border-radius: 7px;
+  padding: 6px 14px; font-size: 12.5px; color: #555;
+  cursor: pointer; background: #fff; user-select: none;
+}
+.receipt-hint {
+  font-size: 11.5px; color: #bbb;
+  margin-top: 7px; display: flex; align-items: center; gap: 5px;
+}
+.receipt-hint::before { content: 'ℹ'; font-size: 12px; color: #ccc; }
+
+/* ── Scrollable list ── */
+.list-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-top: 4px;
+  padding-bottom: calc(var(--safe-bot) + 8px);
+}
+.list-area::-webkit-scrollbar { display: none; }
+
+/* Date separator */
+.date-sep {
+  padding: 14px 18px 5px;
+  font-size: 12px; font-weight: 600;
+  color: #aaa; letter-spacing: .2px;
+}
+
+/* Transaction card */
+.tx {
+  background: #fff;
+  border-radius: 14px;
+  margin: 0 13px 9px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 5px rgba(0,0,0,.07);
+  cursor: pointer;
+  position: relative;
+  transition: transform .1s ease, box-shadow .1s ease;
+  -webkit-user-select: none; user-select: none;
+}
+.tx:active { transform: scale(.985); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+
+.tx-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.tx-tl { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+
+.chk {
+  width: 27px; height: 27px; flex-shrink: 0;
+  border: 1.5px solid #c8c8c8; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.chk svg { width: 13px; height: 13px; }
+
+.tx-name {
+  font-size: 14px; font-weight: 600; color: #111;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 185px;
+}
+.tx-amt { font-size: 15px; font-weight: 700; color: var(--blue); white-space: nowrap; }
+
+.tx-bot { padding-left: 37px; display: flex; flex-direction: column; gap: 3px; }
+.tx-meta { font-size: 11.5px; color: #bbb; display: flex; gap: 8px; }
+.tx-route { font-size: 12.5px; color: #444; line-height: 1.5; padding-right: 22px; }
+
+.tx-chev {
+  position: absolute; right: 14px; bottom: 13px;
+  font-size: 14px; color: #d0d0d0; font-weight: 300;
+}
+
+/* ── Install banner (shown before install) ── */
+.install-banner {
+  display: none;
+  position: fixed;
+  bottom: calc(var(--safe-bot) + 12px);
+  left: 50%; transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 440px;
+  background: #1e3a8a;
+  color: #fff;
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.3);
+  z-index: 999;
+  align-items: center;
+  gap: 12px;
+}
+.install-banner.show { display: flex; }
+.install-icon { font-size: 28px; flex-shrink: 0; }
+.install-text { flex: 1; }
+.install-text h3 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.install-text p  { font-size: 12px; opacity: .8; }
+.install-btn {
+  background: #fff; color: #1e3a8a;
+  border: none; border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.install-close {
+  position: absolute; top: 8px; right: 12px;
+  font-size: 18px; cursor: pointer; opacity: .6;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="safe-top"></div>
+
+  <!-- Header -->
+  <div class="app-header">
+    <div class="btn-back">‹</div>
+    <div class="header-title">교통/하이패스내역</div>
+    <div class="btn-menu"><i></i><i></i><i></i></div>
+  </div>
+
+  <!-- Sticky summary -->
+  <div class="sticky-header">
+    <div class="summary-card">
+      <div class="summary-period">2026.01.01 ~ 2026.01.31</div>
+      <div class="summary-label">이용하신 총 금액은</div>
+      <div class="summary-amount">
+        <span class="pre">총</span>
+        <span class="num">102,580</span>
+        <span class="unit">원</span>
+        <span class="cnt">(91건)</span>
+      </div>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">검색조건</span>
+      <span class="filter-v">∨</span>
+    </div>
+    <div class="count-area">
+      <div class="count-total">총 <strong>91건</strong></div>
+      <div class="count-date">2026.02.23 16:02 기준</div>
+      <div class="btn-receipt">매출전표 출력</div>
+      <div class="receipt-hint">매출전표를 출력할 내역을 선택해주세요</div>
+    </div>
+  </div>
+
+  <!-- ─── Scrollable list ─── -->
+  <div class="list-area" id="listArea">
+
+    <div class="date-sep">2026.01.02</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.02</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:25:42 · 의왕톨게이트 → 08:31:36 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.02</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:36:00 · 의일마을.백문사 → 08:47:03 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.02</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:05:11 · 인덕원푸르지오엘 → 18:15:30 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.02</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:20:42 · 의일마을.백문사 → 18:35:26 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.04</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.04</span><span>본인 6285 | 신용</span></div><div class="tx-route">22:01:15 · 강남역나라빌딩앞 → 22:43:55 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.05</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.05</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:17:15 · 의왕톨게이트 → 08:31:45 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.05</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:37:47 · 의일마을.백문사 → 08:48:41 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.05</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:42:33 · 인덕원푸르지오엘 → 18:55:37 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.05</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:00:01 · 의일마을.백문사 → 19:13:07 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.06</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.06</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:32:45 · 의왕톨게이트 → 08:41:52 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.06</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:45:55 · 의일마을.백문사 → 08:56:10 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.06</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:51:31 · 인덕원푸르지오엘 → 19:01:17 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.06</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:10:39 · 의일마을.백문사 → 19:23:47 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.07</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.07</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:14:38 · 의왕톨게이트 → 08:27:00 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.07</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:29:13 · 의일마을.백문사 → 08:44:32 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.07</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:29:10 · 인덕원푸르지오엘 → 18:46:39 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.07</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:50:29 · 의일마을.백문사 → 19:03:42 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.08</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.08</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:07:38 · 의왕톨게이트 → 08:19:30 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.08</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:29:41 · 의일마을.백문사 → 08:45:10 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.08</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:59:03 · 인덕원푸르지오엘 → 19:16:29 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.08</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:20:01 · 의일마을.백문사 → 19:33:11 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.09</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.09</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:20:13 · 의왕톨게이트 → 08:29:37 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.09</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:31:02 · 의일마을.백문사 → 08:41:10 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.09</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:42:18 · 인덕원푸르지오엘 → 18:55:17 · 원터마을</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.09</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:05:08 · 원터마을 → 19:23:11 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.10</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.10</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:45:31 · 의왕톨게이트 → 20:11:39 · 사당역(중)</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">비씨카드 철도</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.10</span><span>본인 6285 | 신용</span></div><div class="tx-route">20:15:37 · 사당 → 20:39:31 · 강남</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.10</span><span>본인 6285 | 신용</span></div><div class="tx-route">22:59:18 · 강남역나라빌딩앞 → 23:39:15 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.11</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">비씨카드 철도</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.11</span><span>본인 6285 | 신용</span></div><div class="tx-route">16:12:48 · 사당 → 16:29:57 · 삼성(무역센터)</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.12</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.12</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:14:24 · 의왕톨게이트 → 08:24:17 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.12</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:34:11 · 의일마을.백문사 → 08:48:27 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.12</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:29:31 · 인덕원푸르지오엘 → 18:43:09 · 원터마을</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.12</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:47:20 · 원터마을 → 19:02:13 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.13</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.13</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:08:42 · 의왕톨게이트 → 08:20:05 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.13</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:23:31 · 의일마을.백문사 → 08:36:41 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.13</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:59:03 · 인덕원푸르지오엘 → 19:16:29 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.13</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:18:31 · 의일마을.백문사 → 19:29:27 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.14</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.14</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:03:31 · 의왕톨게이트 → 08:14:39 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.14</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:19:28 · 의일마을.백문사 → 08:32:01 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.14</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:55:05 · 인덕원푸르지오엘 → 19:08:13 · 원터마을</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.14</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:13:22 · 원터마을 → 19:26:39 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.15</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.15</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:13:03 · 의왕톨게이트 → 08:23:34 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.15</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:25:03 · 의일마을.백문사 → 08:40:13 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.15</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:45:31 · 인덕원푸르지오엘 → 19:00:04 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.15</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:09:10 · 의일마을.백문사 → 19:20:17 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.16</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.16</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:03:31 · 의왕톨게이트 → 08:14:39 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.16</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:19:28 · 의일마을.백문사 → 08:32:01 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.16</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:55:05 · 인덕원푸르지오엘 → 19:08:13 · 원터마을</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.16</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:13:22 · 원터마을 → 19:26:39 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.18</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">비씨카드 철도</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.18</span><span>본인 6285 | 신용</span></div><div class="tx-route">14:09:05 · 사당 → 14:37:18 · 영등포구청</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">비씨카드 철도</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.18</span><span>본인 6285 | 신용</span></div><div class="tx-route">17:36:15 · 영등포구청 → 18:04:14 · 사당</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.18</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:11:13 · 사당역4번출구 → 19:34:09 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.19</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.19</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:11:01 · 의왕톨게이트 → 08:20:18 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.19</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:24:08 · 의일마을.백문사 → 08:40:17 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.19</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:44:31 · 인덕원푸르지오엘 → 19:00:08 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.19</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:05:22 · 의일마을.백문사 → 19:18:03 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.20</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.20</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:15:32 · 의왕톨게이트 → 08:27:12 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.20</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:33:18 · 의일마을.백문사 → 08:48:43 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.20</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:54:07 · 인덕원푸르지오엘 → 19:18:31 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.20</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:30:51 · 의일마을.백문사 → 19:45:11 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.21</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.21</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:01:15 · 의왕톨게이트 → 08:13:41 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.21</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:21:31 · 의일마을.백문사 → 08:39:08 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.21</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:11:31 · 인덕원푸르지오엘 → 19:23:07 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.21</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:25:08 · 의일마을.백문사 → 19:35:01 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.22</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.22</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:08:07 · 의왕톨게이트 → 08:18:36 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.22</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:19:04 · 의일마을.백문사 → 08:33:17 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.22</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:32:10 · 인덕원푸르지오엘 → 18:45:01 · 원터마을</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.22</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:55:01 · 원터마을 → 19:10:41 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.23</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.23</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:10:01 · 의왕톨게이트 → 08:22:17 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.23</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:27:13 · 의일마을.백문사 → 08:41:01 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.23</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:34:15 · 인덕원푸르지오엘 → 18:47:28 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.23</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:50:03 · 의일마을.백문사 → 19:07:51 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.24</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">부산지하철 (부산지...</span></div><span class="tx-amt">1,600원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.24</span><span>본인 6285 | 신용</span></div><div class="tx-route">17:01:32 · 부산역 → 17:14:32 · 서면역</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.25</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">부산버스 (사상구6번)</span></div><span class="tx-amt">1,480원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.25</span><span>본인 6285 | 신용</span></div><div class="tx-route">11:14:07 · 국민은행 → 11:21:46 · 전포역부산은행</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">부산지하철 (부산지...</span></div><span class="tx-amt">1,600원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.25</span><span>본인 6285 | 신용</span></div><div class="tx-route">20:03:29 · 서면역 → 20:14:51 · 부산역</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.25</span><span>본인 6285 | 신용</span></div><div class="tx-route">23:24:57 · KTX광명역5번출구 → 23:52:28 · 사당역4번출구</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.27</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.27</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:11:01 · 의왕톨게이트 → 08:20:18 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.27</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:24:08 · 의일마을.백문사 → 08:40:17 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.27</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:44:31 · 인덕원푸르지오엘 → 19:00:08 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.27</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:05:22 · 의일마을.백문사 → 19:18:03 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.28</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.28</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:15:32 · 의왕톨게이트 → 08:27:12 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.28</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:33:18 · 의일마을.백문사 → 08:48:43 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.28</span><span>본인 6285 | 신용</span></div><div class="tx-route">18:54:07 · 인덕원푸르지오엘 → 19:18:31 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.28</span><span>본인 6285 | 신용</span></div><div class="tx-route">19:30:51 · 의일마을.백문사 → 19:45:11 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.29</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.29</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:01:15 · 의왕톨게이트 → 08:13:41 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.29</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:21:31 · 의일마을.백문사 → 08:39:08 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.30</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.30</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:01:15 · 의왕톨게이트 → 08:13:41 · 백운사거리</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">0원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.30</span><span>본인 6285 | 신용</span></div><div class="tx-route">08:21:31 · 의일마을.백문사 → 08:39:08 · 인덕원푸르지오엘</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기도마을버스(int...</span></div><span class="tx-amt">1,650원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.30</span><span>본인 6285 | 신용</span></div><div class="tx-route">22:13:08 · 인덕원푸르지오엘 → 22:20:38 · 의일마을.백문사</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.30</span><span>본인 6285 | 신용</span></div><div class="tx-route">22:27:03 · 의일마을.백문사 → 22:36:51 · 의왕톨게이트</div></div><div class="tx-chev">∨</div></div>
+
+    <div class="date-sep">2026.01.31</div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">경기버스운송사업...</span></div><span class="tx-amt">3,200원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.31</span><span>본인 6285 | 신용</span></div><div class="tx-route">13:31:28 · 의왕톨게이트 → 13:59:20 · 사당역(중)</div></div><div class="tx-chev">∨</div></div>
+    <div class="tx"><div class="tx-top"><div class="tx-tl"><div class="chk"><svg viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#777" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="tx-name">비씨카드 철도</span></div><span class="tx-amt">1,550원</span></div><div class="tx-bot"><div class="tx-meta"><span>2026.01.31</span><span>본인 6285 | 신용</span></div><div class="tx-route">16:00:42 · 사당 → 16:16:07 · 삼성(무역센터)</div></div><div class="tx-chev">∨</div></div>
+
+    <div style="height:28px;"></div>
+  </div><!-- /list-area -->
+</div><!-- /app -->
+
+<!-- Install banner -->
+<div class="install-banner" id="installBanner">
+  <span class="install-close" id="installClose">✕</span>
+  <div class="install-icon">🚌</div>
+  <div class="install-text">
+    <h3>홈 화면에 추가하기</h3>
+    <p>앱처럼 바로가기를 만들 수 있어요!</p>
+  </div>
+  <button class="install-btn" id="installBtn">추가</button>
+</div>
+
+<script>
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW error:', err));
+  });
+}
+
+// PWA Install prompt
+let deferredPrompt = null;
+const banner  = document.getElementById('installBanner');
+const installBtn = document.getElementById('installBtn');
+const closeBtn   = document.getElementById('installClose');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show banner after short delay
+  setTimeout(() => banner.classList.add('show'), 1500);
+});
+
+installBtn.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('Install outcome:', outcome);
+    deferredPrompt = null;
+  }
+  banner.classList.remove('show');
+});
+
+closeBtn.addEventListener('click', () => {
+  banner.classList.remove('show');
+});
+
+// Hide banner once installed
+window.addEventListener('appinstalled', () => {
+  banner.classList.remove('show');
+  deferredPrompt = null;
+});
+</script>
+</body>
+</html>
