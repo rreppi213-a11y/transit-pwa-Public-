@@ -1,7 +1,7 @@
 {
   "name": "교통/하이패스내역",
   "short_name": "교통내역",
-  "description": "2026년 1월 교통 및 하이패스 이용 내역",
+  "description": "교통 및 하이패스 이용 내역",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
